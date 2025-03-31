@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPT API 테스트</title>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #sentenceList {
+            list-style: none;
+            padding: 0;
+        }
+        #sentenceList li {
+            background-color: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        #sentenceList li:hover {
+            transform: translateY(-2px);
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #userInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #response {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+        .api-key-container {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 5px;
+        }
+        #apiKey, #serverUrl {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .reset-btn {
+            padding: 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .reset-btn:hover {
+            background-color: #c82333;
+        }
+        .save-key-btn {
+            background-color: #28a745;
+        }
+        .save-key-btn:hover {
+            background-color: #218838;
+        }
+        .chat-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            margin-left: 20%;
+        }
+        .bot-message {
+            background-color: #e9ecef;
+            color: black;
+            margin-right: 20%;
+        }
+        .mode-switch {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>GPT API 테스트</h1>
+    <div class="chat-container">
+        <div class="api-key-container">
+            <div class="input-group">
+                <input type="password" id="apiKey" placeholder="OpenAI API 키를 입력하세요. 미입력시 기본 API 사용">
+                <button onclick="resetField('apiKey')" class="reset-btn">초기화</button>
+            </div>
+            <div class="input-group">
+                <input type="text" id="serverUrl" placeholder="서버 주소를 입력하세요 (예: http://localhost:8000)">
+                <button onclick="resetField('serverUrl')" class="reset-btn">초기화</button>
+            </div>
+            <button onclick="saveSettings()" class="save-key-btn">설정 저장</button>
+        </div>
+        <div class="mode-switch">
+            <label>
+                <input type="checkbox" id="continuousMode"> 연속 대화 모드
+            </label>
+            <button onclick="clearChat()" id="clearChatBtn" style="display: none;">대화 기록 지우기</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="메시지를 입력하세요...">
+            <button onclick="sendMessage()">전송</button>
+        </div>
+    </div>
+
+    <script>
+        let conversationId = null;
+        let savedApiKey = localStorage.getItem('openai_api_key') || '';
+        let savedServerUrl = localStorage.getItem('server_url') || 'http://localhost:8000';
+        
+        if (savedApiKey) {
+            document.getElementById('apiKey').value = savedApiKey;
+        }
+        if (savedServerUrl) {
+            document.getElementById('serverUrl').value = savedServerUrl;
+        }
+
+        function resetField(fieldId) {
+            const field = document.getElementById(fieldId);
+            field.value = '';
+            if (fieldId === 'apiKey') {
+                localStorage.removeItem('openai_api_key');
+            } else if (fieldId === 'serverUrl') {
+                localStorage.removeItem('server_url');
+                field.value = 'http://localhost:8000'; // 기본값 설정
+            }
+        }
+
+        function saveSettings() {
+            const apiKey = document.getElementById('apiKey').value;
+            const serverUrl = document.getElementById('serverUrl').value;
+            
+            if (apiKey) {
+                localStorage.setItem('openai_api_key', apiKey);
+            }
+            if (serverUrl) {
+                localStorage.setItem('server_url', serverUrl);
+            }
+            alert('설정이 저장되었습니다.');
+        }
+
+        function toggleChatMode() {
+            const isContinuous = document.getElementById('continuousMode').checked;
+            const clearBtn = document.getElementById('clearChatBtn');
+            if (isContinuous) {
+                conversationId = Date.now().toString();
+                clearBtn.style.display = 'inline-block';
+            } else {
+                conversationId = null;
+                clearBtn.style.display = 'none';
+                document.getElementById('chatMessages').innerHTML = '';
+            }
+        }
+
+        async function clearChat() {
+            if (conversationId) {
+                const serverUrl = document.getElementById('serverUrl').value || 'http://localhost:8000';
+                await fetch(`${serverUrl}/chat/${conversationId}`, {
+                    method: 'DELETE'
+                });
+                document.getElementById('chatMessages').innerHTML = '';
+                conversationId = Date.now().toString();
+            }
+        }
+
+        function addMessage(message, isUser) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.textContent = message;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        document.getElementById('continuousMode').addEventListener('change', toggleChatMode);
+
+        async function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const message = userInput.value;
+            const apiKey = document.getElementById('apiKey').value;
+            const serverUrl = document.getElementById('serverUrl').value || 'http://localhost:8000';
+            const isContinuous = document.getElementById('continuousMode').checked;
+
+            if (!message) return;
+
+            addMessage(message, true);
+
+            try {
+                const response = await fetch(`${serverUrl}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        message: message,
+                        api_key: apiKey || null,
+                        conversation_id: conversationId,
+                        is_continuous: isContinuous
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.error) {
+                    addMessage(`오류: ${data.error}`, false);
+                } else {
+                    addMessage(data.response, false);
+                }
+                userInput.value = '';
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('오류가 발생했습니다.', false);
+            }
+        }
+
+        // Enter 키 입력 처리
+        document.getElementById('userInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
+
