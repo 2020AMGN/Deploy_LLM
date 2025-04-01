@@ -1,5 +1,8 @@
+# dev-env 폴더 무시
+# dev-env
 
-dev-env/
+# 모든 dev-env 폴더 무시
+**/dev-env/
 
 # 모든 .env 파일 무시
 **/.env
